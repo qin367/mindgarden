@@ -276,7 +276,7 @@
     settings: { ...defaultSettings },
     currentView: 'nursery',
     // UI 状态
-    nursery: { mood: null, tags: '', content: '' },
+    nursery: { mood: null, tags: '', content: '', filterTag: null },
     seedbox: { filterTag: null, showArchived: false },
     greenhouse: { activeInspirationId: null },
     calendar: { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: null },
@@ -350,6 +350,8 @@
 
   /** 关闭模态框 */
   const closeModal = (result) => {
+    // 清除沙盘定时器
+    if (toolState.sandboxTimer) { clearInterval(toolState.sandboxTimer); toolState.sandboxTimer = null; }
     document.getElementById('modalOverlay').classList.remove('open');
     if (modalResolve) { modalResolve(result); modalResolve = null; }
   };
@@ -386,7 +388,7 @@
     const items = state.inspirations.filter(i => !i.archived);
     // 收集所有标签用于筛选
     const allTags = [...new Set(items.flatMap(i => i.tags))];
-    const filterTag = state.seedbox.filterTag;
+    const filterTag = state.nursery.filterTag;
 
     // 如果有筛选标签
     const filtered = filterTag ? items.filter(i => i.tags.includes(filterTag)) : items;
@@ -621,7 +623,7 @@
           <h3>🧺 已加入的点子 (${projectIdeas.length})</h3>
           ${projectIdeas.length > 0
             ? `<ul class="sortable-list">${projectIdeas.map(idea => `
-              <li class="sortable-item" draggable="true" data-idea-id="${idea.id}">
+              <li class="sortable-item" data-idea-id="${idea.id}">
                 <span>🔬</span>
                 <span style="flex:1;">${escapeHtml(idea.content.slice(0, 60))}${idea.content.length > 60 ? '…' : ''}</span>
                 <button class="btn btn-sm btn-ghost" data-action="remove-idea-from-bouquet" data-bid="${p.id}" data-iid="${idea.id}">✕</button>
@@ -697,7 +699,7 @@
           <span style="font-size:1.3rem;">${insp.mood || '🌱'}</span>
           <div>
             <div style="font-size:0.95rem;">${escapeHtml(insp.content)}</div>
-            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">${insp.tags.map(t => '#' + t).join(' ')}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">${insp.tags.map(t => '#' + escapeHtml(t)).join(' ')}</div>
           </div>
         </div>
         <div class="map-children">
@@ -756,7 +758,7 @@
       cells.push({ day: d, dateStr, isToday: dateStr === todayStr, hasEntry: !!entriesByDate[dateStr] });
     }
     // 下月填充
-    const remaining = 42 - cells.length; // 6 rows
+    const remaining = Math.max(0, 42 - cells.length); // 6 rows
     for (let d = 1; d <= remaining; d++) {
       cells.push({ day: d, otherMonth: true });
     }
@@ -789,7 +791,7 @@
                   <span class="inspiration-time">灵感</span>
                 </div>
                 <div class="inspiration-content">${escapeHtml(e.data.content)}</div>
-                <div class="inspiration-tags">${e.data.tags.map(t => `<span class="inspiration-tag">#${t}</span>`).join('')}</div>
+                <div class="inspiration-tags">${e.data.tags.map(t => `<span class="inspiration-tag">#${escapeHtml(t)}</span>`).join('')}</div>
               </div>`;
             } else {
               return `<div class="idea-card" style="margin-bottom:8px;">
@@ -889,21 +891,7 @@
     if (!target) return;
     const action = target.dataset.action;
 
-    // 导航
-    if (action === 'navigate') {
-      state.currentView = target.dataset.view;
-      state.bouquetDetail = null;
-      render();
-      return;
-    }
-
     switch (action) {
-      // ========== 导航 ==========
-      case 'navigate':
-        state.currentView = target.dataset.view;
-        state.bouquetDetail = null;
-        render();
-        break;
 
       // ========== 苗圃 ==========
       case 'select-mood':
@@ -935,7 +923,7 @@
 
       // ========== 种子箱筛选 ==========
       case 'filter-tag':
-        state.seedbox.filterTag = target.dataset.tag || null;
+        state.nursery.filterTag = target.dataset.tag || null;
         render();
         break;
       case 'sfilter-tag':
@@ -1011,7 +999,12 @@
 
       case 'delete-inspiration': {
         if (!confirm('确定要删除这条灵感吗？')) break;
-        state.inspirations = state.inspirations.filter(i => i.id !== target.dataset.id);
+        const deletedId = target.dataset.id;
+        state.inspirations = state.inspirations.filter(i => i.id !== deletedId);
+        // 清理孤儿引用
+        state.ideas.forEach(idea => { if (idea.inspirationId === deletedId) idea.inspirationId = null; });
+        state.projects.forEach(p => { p.inspirationIds = p.inspirationIds.filter(id => id !== deletedId); });
+        if (state.greenhouse.activeInspirationId === deletedId) state.greenhouse.activeInspirationId = null;
         save();
         render();
         toast('🗑️ 已删除');
@@ -1071,7 +1064,10 @@
 
       case 'delete-idea': {
         if (!confirm('确定要删除这个点子吗？')) break;
-        state.ideas = state.ideas.filter(i => i.id !== target.dataset.id);
+        const deletedId = target.dataset.id;
+        state.ideas = state.ideas.filter(i => i.id !== deletedId);
+        // 清理孤儿引用
+        state.projects.forEach(p => { p.ideaIds = p.ideaIds.filter(id => id !== deletedId); });
         save();
         render();
         toast('🗑️ 已删除');
@@ -1121,7 +1117,11 @@
 
       case 'delete-bouquet': {
         if (!confirm('确定要删除这个花束吗？')) break;
-        state.projects = state.projects.filter(p => p.id !== target.dataset.id);
+        const deletedId = target.dataset.id;
+        state.projects = state.projects.filter(p => p.id !== deletedId);
+        // 清理孤儿引用：将关联点子的 projectId 清空
+        state.ideas.forEach(idea => { if (idea.projectId === deletedId) idea.projectId = null; });
+        if (state.bouquetDetail === deletedId) state.bouquetDetail = null;
         save();
         render();
         toast('🗑️ 已删除');
@@ -1190,7 +1190,7 @@
       case 'save-bouquet-notes': {
         const p = state.projects.find(pr => pr.id === target.dataset.bid);
         const notes = document.getElementById('bouquetNotes')?.value;
-        if (p) { p.notes = notes || ''; save(); toast('✅ 备注已保存'); }
+        if (p) { p.notes = notes || ''; save(); render(); toast('✅ 备注已保存'); }
         break;
       }
 
@@ -1237,11 +1237,12 @@
       }
 
       case 'export-json': {
+        const safeSettings = { ...state.settings, apiKey: '' };
         const data = {
           inspirations: state.inspirations,
           ideas: state.ideas,
           projects: state.projects,
-          settings: state.settings,
+          settings: safeSettings,
           exportedAt: new Date().toISOString()
         };
         downloadFile('mindgarden-backup.json', JSON.stringify(data, null, 2), 'application/json');
@@ -1252,30 +1253,6 @@
       case 'import-json':
         document.getElementById('importFileInput').click();
         break;
-
-      case 'import-file': {
-        const file = target.files[0];
-        if (!file) break;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const data = JSON.parse(e.target.result);
-            if (data.inspirations) state.inspirations = data.inspirations;
-            if (data.ideas) state.ideas = data.ideas;
-            if (data.projects) state.projects = data.projects;
-            if (data.settings) state.settings = { ...state.settings, ...data.settings };
-            save();
-            render();
-            toast('📥 导入成功！');
-          } catch (err) {
-            toast('❌ 导入失败：文件格式错误');
-          }
-        };
-        reader.readAsText(file);
-        // 重置 input 以便重复导入同一个文件
-        target.value = '';
-        break;
-      }
 
       case 'export-html': {
         exportAlbumHTML();
@@ -1429,7 +1406,10 @@
       tool.guide,
       `<div class="tool-guide">💡 试着想想：如果要让这件事彻底失败，你会怎么做？然后我们一起来反转它。</div>
        <textarea id="reverseGoal" rows="2" placeholder="你的目标或灵感是什么？${inspText ? '（已自动带入当前灵感）' : ''}">${inspText.replace('当前灵感：', '')}</textarea>
-       <textarea id="reverseFail" rows="3" placeholder="如何搞砸它？越具体越好：&#10;· 忽略什么？&#10;· 过度做什么？&#10;· 故意做错什么？"></textarea>
+       <textarea id="reverseFail" rows="3" placeholder="如何搞砸它？越具体越好：
+· 忽略什么？
+· 过度做什么？
+· 故意做错什么？"></textarea>
        <hr style="border-color:var(--border);margin:12px 0;">
        <div class="tool-guide" style="border-left-color:var(--accent-gold);">✨ 现在，把上面的"搞砸方案"反过来，就是一个好点子！</div>
        <textarea id="toolResultContent" rows="3" placeholder="把反转后的点子写下来……"></textarea>
@@ -1463,17 +1443,20 @@
        <button class="btn btn-primary" data-action="save-tool-result" data-tool-idx="${TOOLS.indexOf(tool)}">🌾 收获</button>`
     );
 
-    // SCAMPER 标签切换
+    // SCAMPER 标签切换 — 使用事件委托，避免重复绑定
     setTimeout(() => {
-      document.querySelector('#modalBody')?.addEventListener('click', (e) => {
+      const body = document.getElementById('modalBody');
+      if (!body) return;
+      if (toolState._scamperHandler) body.removeEventListener('click', toolState._scamperHandler);
+      toolState._scamperHandler = (e) => {
         const tab = e.target.closest('[data-action="scamper-tab"]');
         if (!tab) return;
         toolState.scamperActiveTag = parseInt(tab.dataset.index);
-        // 只重新渲染 body
-        const body = document.getElementById('modalBody');
-        if (body) {
-          const active = SCAMPER_TAGS[toolState.scamperActiveTag];
-          body.innerHTML = `
+        const active = SCAMPER_TAGS[toolState.scamperActiveTag];
+        // 保存用户已输入的内容
+        const savedContent = document.getElementById('toolResultContent')?.value || '';
+        const savedTags = document.getElementById('toolResultTags')?.value || '';
+        body.innerHTML = `
             <div class="tool-guide">当前灵感：${inspText || '（自由模式）'}</div>
             <div class="scamper-tabs" id="scamperTabs">
               ${SCAMPER_TAGS.map((t, i) => `
@@ -1481,10 +1464,10 @@
               `).join('')}
             </div>
             <div class="tool-guide" style="border-left-color:var(--accent-gold);">${active.question}</div>
-            <textarea id="toolResultContent" rows="4" placeholder="从这个角度出发，你有什么新想法？"></textarea>
-            <input class="form-input" id="toolResultTags" placeholder="#标签 用 # 分割">`;
-        }
-      });
+            <textarea id="toolResultContent" rows="4" placeholder="从这个角度出发，你有什么新想法？">${savedContent}</textarea>
+            <input class="form-input" id="toolResultTags" placeholder="#标签 用 # 分割" value="${savedTags}">`;
+      };
+      body.addEventListener('click', toolState._scamperHandler);
     }, 50);
   };
 
@@ -1565,16 +1548,18 @@
        <button class="btn btn-primary" data-action="save-tool-result" data-tool-idx="${TOOLS.indexOf(tool)}">🌾 收获</button>`
     );
 
-    // 监听洋葱层输入
+    // 监听洋葱层输入 — 移除旧监听器，避免重复绑定
     setTimeout(() => {
       const body = document.getElementById('modalBody');
       if (!body) return;
-      body.addEventListener('input', (e) => {
+      if (toolState._onionHandler) body.removeEventListener('input', toolState._onionHandler);
+      toolState._onionHandler = (e) => {
         const textarea = e.target.closest('.onion-answer');
         if (!textarea) return;
         const idx = parseInt(textarea.dataset.layer);
         if (!isNaN(idx) && layers[idx]) layers[idx].a = textarea.value;
-      });
+      };
+      body.addEventListener('input', toolState._onionHandler);
     }, 50);
   };
 
@@ -1626,15 +1611,19 @@
        <button class="btn btn-primary" data-action="save-tool-result" data-tool-idx="${TOOLS.indexOf(tool)}">🌾 收获</button>`
     );
 
-    // 帽子切换
+    // 帽子切换 — 使用事件委托，避免重复绑定
     setTimeout(() => {
       const body = document.getElementById('modalBody');
       if (!body) return;
-      body.addEventListener('click', (e) => {
+      if (toolState._hatsHandler) body.removeEventListener('click', toolState._hatsHandler);
+      toolState._hatsHandler = (e) => {
         const btn = e.target.closest('[data-action="hat-switch"]');
         if (!btn) return;
         toolState.hatsCurrent = parseInt(btn.dataset.index);
         const hat = HATS[toolState.hatsCurrent];
+        // 保存用户已输入的内容
+        const savedContent = document.getElementById('toolResultContent')?.value || '';
+        const savedTags = document.getElementById('toolResultTags')?.value || '';
         body.innerHTML = `
           <div class="tool-guide">当前灵感：${inspText || '（自由模式）'}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
@@ -1646,9 +1635,10 @@
             <span class="hat-label hat-${hat.key}-bg">${hat.label}</span>
             <div>${hat.question}</div>
           </div>
-          <textarea id="toolResultContent" rows="4" placeholder="戴上这顶帽子，你看到了什么？"></textarea>
-          <input class="form-input" id="toolResultTags" placeholder="#标签 用 # 分割">`;
-      });
+          <textarea id="toolResultContent" rows="4" placeholder="戴上这顶帽子，你看到了什么？">${savedContent}</textarea>
+          <input class="form-input" id="toolResultTags" placeholder="#标签 用 # 分割" value="${savedTags}">`;
+      };
+      body.addEventListener('click', toolState._hatsHandler);
     }, 50);
   };
 
@@ -1661,7 +1651,8 @@
       tool.guide,
       `<div class="tool-guide">${inspText || '让思绪自由流淌，什么都不用想，只管写。'}</div>
        <div class="sandbox-words" id="sandboxWords"></div>
-       <textarea id="toolResultContent" rows="6" placeholder="写下任何出现在脑海里的东西……&#10;不用组织语言，不用判断好坏，只是写。"></textarea>
+       <textarea id="toolResultContent" rows="6" placeholder="写下任何出现在脑海里的东西……
+不用组织语言，不用判断好坏，只是写。"></textarea>
        <input class="form-input" id="toolResultTags" placeholder="#标签 用 # 分割">`,
       `<button class="btn btn-ghost" data-action="close-modal">取消</button>
        <button class="btn btn-primary" data-action="save-tool-result" data-tool-idx="${TOOLS.indexOf(tool)}">🌾 收获</button>`
@@ -1833,7 +1824,7 @@ h2 { color: #8fa88a; border-bottom: 1px solid #e8ddd0; padding-bottom: 8px; marg
             <span class="time">${new Date(insp.createdAt).toLocaleDateString('zh-CN')}</span>
           </div>
           <div style="margin:8px 0;">${escapeHtml(insp.content)}</div>
-          <div>${insp.tags.map(t => `<span class="tag">#${t}</span>`).join(' ')}</div>
+          <div>${insp.tags.map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join(' ')}</div>
         </div>`;
       });
     }
@@ -1844,7 +1835,7 @@ h2 { color: #8fa88a; border-bottom: 1px solid #e8ddd0; padding-bottom: 8px; marg
         html += `<div class="card">
           <div><span class="idea-tool">🔬 ${escapeHtml(idea.tool)}</span> ${idea.liked ? '<span class="liked">❤️</span>' : ''}</div>
           <div style="margin:8px 0;">${escapeHtml(idea.content)}</div>
-          <div>${idea.tags.map(t => `<span class="tag">#${t}</span>`).join(' ')}</div>
+          <div>${idea.tags.map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join(' ')}</div>
         </div>`;
       });
     }
@@ -1883,6 +1874,11 @@ h2 { color: #8fa88a; border-bottom: 1px solid #e8ddd0; padding-bottom: 8px; marg
 
   document.getElementById('modalOverlay').addEventListener('click', (e) => {
     if (e.target === document.getElementById('modalOverlay')) {
+      // 如果工具有未保存内容，提示确认
+      const content = document.getElementById('toolResultContent');
+      if (content && content.value.trim()) {
+        if (!confirm('关闭模态框将丢失未保存的内容，确定关闭吗？')) return;
+      }
       closeModal(null);
     }
   });

@@ -15,6 +15,8 @@
 import argparse
 import json
 import os
+import random
+import ssl
 import sys
 import urllib.request
 import urllib.error
@@ -23,6 +25,7 @@ import urllib.error
 ENDPOINT = os.environ.get("API_ENDPOINT", "http://localhost:11434/v1/chat/completions")
 API_KEY = os.environ.get("API_KEY", "")
 MODEL = os.environ.get("API_MODEL", "gpt-3.5-turbo")
+SSL_VERIFY = os.environ.get("API_SSL_VERIFY", "1") not in ("0", "false", "no", "off")
 
 
 def call_api(system_prompt: str, user_prompt: str) -> str:
@@ -41,13 +44,19 @@ def call_api(system_prompt: str, user_prompt: str) -> str:
         "max_tokens": 800
     }).encode("utf-8")
 
+    ctx = None
+    if not SSL_VERIFY:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
     req = urllib.request.Request(ENDPOINT, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=60, context=ctx) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data["choices"][0]["message"]["content"].strip()
     except urllib.error.URLError as e:
-        return f"[连接失败] {e.reason}"
+        return f"[连接失败] {e.reason}\n提示：如需禁用 SSL 验证，设置环境变量 API_SSL_VERIFY=0"
     except Exception as e:
         return f"[错误] {e}"
 
@@ -103,7 +112,6 @@ def tool_extreme(inspiration: str, condition: str = "") -> str:
         "用户是一只猫", "在月球上", "所有东西都要能食用",
         "只能用声音和光线", "在暴风雨中", "为 100 年后的世界设计"
     ]
-    import random
     cond = condition or random.choice(conditions)
 
     prompt = f"""在以下极端条件下，这个灵感会发生什么变异？
@@ -144,12 +152,14 @@ def tool_first_principles(inspiration: str) -> str:
 def tool_pollen(inspiration: str) -> str:
     """随机花粉：用随机词汇强行关联。"""
     words = [
-        "月亮", "咖啡渍", "旧毛衣", "北极光", "气泡", "纸飞机",
-        "回声", "蒲公英", "琥珀", "潮汐", "苔藓", "影子",
-        "篝火", "露珠", "风筝线", "涟漪", "羽毛", "钟摆",
-        "茧", "漂流瓶", "年轮", "雾", "焰火", "漩涡", "萤火虫"
+        "月亮", "咖啡渍", "旧毛衣", "北极光", "气泡",
+        "纸飞机", "回声", "蒲公英", "琥珀", "潮汐",
+        "苔藓", "影子", "篝火", "露珠", "风筝线",
+        "涟漪", "羽毛", "钟摆", "茧", "漂流瓶",
+        "年轮", "雾", "焰火", "漩涡", "结绳",
+        "蝉壳", "浮冰", "孔明灯", "沙漏", "罗盘",
+        "稗子", "墨迹", "残雪", "萤火虫", "鲸歌"
     ]
-    import random
     word = random.choice(words)
 
     prompt = f"""请把以下两个看似无关的概念强行关联起来，催生新的创意：

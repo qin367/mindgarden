@@ -1,0 +1,87 @@
+/* ====== 灵感列表（种子箱） ====== */
+.inspiration-list { display: flex; flex-direction: column; gap: 12px; }
+
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filter-tag {
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  font-family: var(--font-body);
+}
+
+.filter-tag:hover { background: var(--bg-hover); }
+.filter-tag.active {
+  background: var(--accent-sage-light);
+  border-color: var(--accent-sage);
+  color: var(--accent-sage);
+}
+
+.inspiration-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  transition: all 0.3s ease;
+  box-shadow: 0 1px 6px var(--shadow);
+}
+
+.inspiration-item:hover {
+  box-shadow: 0 3px 12px var(--shadow-hover);
+}
+
+.inspiration-item.archived { opacity: 0.6; }
+
+.inspiration-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.inspiration-mood { font-size: 1.3rem; }
+
+.inspiration-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: var(--font-english);
+}
+
+.inspiration-content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.inspiration-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.inspiration-tag {
+  font-size: 0.8rem;
+  color: var(--accent-terracotta);
+  background: var(--accent-terracotta-light);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.inspiration-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+

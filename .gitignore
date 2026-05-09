@@ -2,16 +2,34 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.env
+.env.local
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# IDE
-.vscode/
-.idea/
+# Build
+dist/
+build/
+*.log
 
-# Environment
-.env
-.env.local
+# Backup
+backup/
+
+# Temporary
+*.tmp
+*.temp

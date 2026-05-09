@@ -1,0 +1,76 @@
+/* ====== 日历 ====== */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.calendar-title { font-size: 1.2rem; font-weight: 600; }
+
+.calendar-nav {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.calendar-nav:hover { background: var(--bg-hover); }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 8px 0;
+  font-family: var(--font-english);
+}
+
+.calendar-day {
+  text-align: center;
+  padding: 10px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  min-height: 44px;
+}
+
+.calendar-day:hover { background: var(--bg-hover); border-color: var(--border); }
+.calendar-day.other-month { color: var(--text-muted); background: transparent; }
+.calendar-day.today { border-color: var(--accent-gold); font-weight: 600; }
+.calendar-day.has-entry::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-terracotta);
+}
+.calendar-day.selected {
+  background: var(--accent-sage-light);
+  border-color: var(--accent-sage);
+}
+
+.calendar-entries { margin-top: 20px; }
+.calendar-entries-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; }
+

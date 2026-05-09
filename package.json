@@ -1,0 +1,38 @@
+{
+  "name": "mindgarden",
+  "version": "1.0.0",
+  "description": "🌱 MindGarden 创意花园 - 一个纯本地、离线可用的私人创意管理应用",
+  "main": "src/js/main.js",
+  "scripts": {
+    "start": "npx serve . -l 8080",
+    "dev": "npx serve . -l 8080",
+    "build": "echo 'No build step required'",
+    "test": "echo 'No tests yet'",
+    "lint": "echo 'No linter configured'",
+    "split-css": "node scripts/split-css.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/mindgarden.git"
+  },
+  "keywords": [
+    "creativity",
+    "note-taking",
+    "offline",
+    "local-storage",
+    "garden",
+    "ideas"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yourusername/mindgarden/issues"
+  },
+  "homepage": "https://github.com/yourusername/mindgarden#readme",
+  "devDependencies": {
+    "serve": "^14.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

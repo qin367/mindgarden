@@ -1,0 +1,36 @@
+/* ====== 花束 ====== */
+.bouquet-list { display: flex; flex-direction: column; gap: 16px; }
+
+.bouquet-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: 0 1px 6px var(--shadow);
+}
+
+.bouquet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.bouquet-name { font-size: 1.1rem; font-weight: 600; }
+.bouquet-desc { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 12px; }
+.bouquet-count { font-size: 0.8rem; color: var(--text-muted); }
+
+.bouquet-export-btn { margin-left: auto; }
+
+/* 花束详情 - 可拖拽列表 */
+.sortable-list { list-style: none; padding: 0; }
+.sortable-item {
+  padding: 10px 14px;
+  background: var(--bg-page);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  transition: background 0.2s ease;
+}
+.sortable-item:active { cursor: grabbing; background: var(--bg-hover); }
+.sortable-item.dragging { opacity: 0.5; }
+

@@ -1,0 +1,50 @@
+/* ====== CSS 变量：主题系统 ====== */
+:root {
+  /* 浅色主题（温暖田园风） */
+  --bg-page: #fdf8f0;
+  --bg-card: #fffcf5;
+  --bg-sidebar: #f5ede1;
+  --bg-input: #fffcf5;
+  --bg-hover: #f0e8d8;
+  --text-primary: #3b2b1f;
+  --text-secondary: #7a6a5a;
+  --text-muted: #a89888;
+  --accent-sage: #8fa88a;
+  --accent-sage-light: #d6e3d0;
+  --accent-terracotta: #c17f59;
+  --accent-terracotta-light: #f0d5c4;
+  --accent-brown: #8b6b4a;
+  --accent-gold: #d4a853;
+  --border: #e8ddd0;
+  --border-light: #f0e8dd;
+  --shadow: rgba(59, 43, 31, 0.08);
+  --shadow-hover: rgba(59, 43, 31, 0.15);
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --font-body: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-english: Georgia, "Times New Roman", serif;
+}
+
+/* 深色主题 */
+[data-theme="dark"] {
+  --bg-page: #1e2a1e;
+  --bg-card: #2a3a2a;
+  --bg-sidebar: #243024;
+  --bg-input: #2a3a2a;
+  --bg-hover: #354535;
+  --text-primary: #d4c9b8;
+  --text-secondary: #b0a898;
+  --text-muted: #7a7268;
+  --accent-sage: #7a9a74;
+  --accent-sage-light: #3a4f3a;
+  --accent-terracotta: #b87855;
+  --accent-terracotta-light: #4a3530;
+  --accent-brown: #b8956a;
+  --accent-gold: #c8a050;
+  --border: #3a4a3a;
+  --border-light: #3a4a3a;
+  --shadow: rgba(0, 0, 0, 0.2);
+  --shadow-hover: rgba(0, 0, 0, 0.35);
+}
+

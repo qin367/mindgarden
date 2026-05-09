@@ -1,0 +1,81 @@
+/* ====== 花园地图 ====== */
+.garden-map {
+  padding: 20px 0;
+  overflow-x: auto;
+}
+
+.map-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.map-root {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px var(--shadow);
+  position: relative;
+}
+
+.map-root::after {
+  content: '';
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  width: 2px;
+  height: 24px;
+  background: var(--accent-sage);
+}
+
+.map-children {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-left: 40px;
+  position: relative;
+}
+
+.map-children::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--border);
+}
+
+.map-child {
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 4px var(--shadow);
+  position: relative;
+  max-width: 300px;
+  font-size: 0.9rem;
+}
+
+.map-child::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  width: 16px;
+  height: 2px;
+  background: var(--border);
+}
+
+.map-child .tool-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+

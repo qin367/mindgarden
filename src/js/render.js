@@ -197,11 +197,11 @@ window.MindGarden = window.MindGarden || {};
       : '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px 20px;margin-bottom:20px;box-shadow:0 1px 6px var(--shadow);text-align:center;color:var(--text-muted);font-size:0.9rem;">💡 从苗圃或种子箱点击 "🌱 培育" 带上一个灵感，或直接用下面的工具自由创造</div>';
 
     var toolGrid = MG.TOOLS.map(function(t, i) {
-      return MG.html`<div class="tool-card" data-action="open-tool" data-tool-index="${i}" role="button" aria-label="打开${t.name}工具：${t.desc}">
-        <div class="tool-icon">${t.icon}</div>
-        <div class="tool-name">${t.name}</div>
-        <div class="tool-desc">${t.desc}</div>
-      </div>`;
+      return '<div class="tool-card" data-action="open-tool" data-tool-index="' + i + '" role="button" aria-label="打开' + MG.escapeHtml(t.name) + '工具：' + MG.escapeHtml(t.desc) + '">' +
+        '<div class="tool-icon">' + t.icon + '</div>' +
+        '<div class="tool-name">' + MG.escapeHtml(t.name) + '</div>' +
+        '<div class="tool-desc">' + MG.escapeHtml(t.desc) + '</div>' +
+      '</div>';
     }).join('');
 
     return banner + '<div class="tool-grid">' + toolGrid + '</div>';

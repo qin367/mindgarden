@@ -5,6 +5,7 @@
   python idea_generator.py                          # 交互式菜单
   python idea_generator.py --tool reverse "灵感文本"  # 指定工具
   python idea_generator.py --list                    # 列出所有工具
+  python idea_generator.py --tool extreme "灵感" --retry 3 --timeout 30
 
 环境变量:
   API_ENDPOINT   API 端点 (默认 http://localhost:11434/v1/chat/completions)
@@ -16,10 +17,10 @@ import argparse
 import json
 import os
 import random
-import ssl
 import sys
-import urllib.request
-import urllib.error
+import time
+
+import requests
 
 # ── API 配置 ──────────────────────────────────────────────
 ENDPOINT = os.environ.get("API_ENDPOINT", "http://localhost:11434/v1/chat/completions")
@@ -28,13 +29,20 @@ MODEL = os.environ.get("API_MODEL", "gpt-3.5-turbo")
 SSL_VERIFY = os.environ.get("API_SSL_VERIFY", "1") not in ("0", "false", "no", "off")
 
 
-def call_api(system_prompt: str, user_prompt: str) -> str:
-    """调用 OpenAI 兼容 API。"""
+class APIError(Exception):
+    """API 调用错误，包含可重试信息。"""
+    def __init__(self, message: str, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable
+
+
+def call_api(system_prompt: str, user_prompt: str, timeout: int = 60) -> str:
+    """调用 OpenAI 兼容 API，失败时抛出 APIError。"""
     headers = {"Content-Type": "application/json"}
     if API_KEY:
         headers["Authorization"] = f"Bearer {API_KEY}"
 
-    body = json.dumps({
+    body = {
         "model": MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -42,23 +50,65 @@ def call_api(system_prompt: str, user_prompt: str) -> str:
         ],
         "temperature": 0.9,
         "max_tokens": 800
-    }).encode("utf-8")
+    }
 
-    ctx = None
-    if not SSL_VERIFY:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-
-    req = urllib.request.Request(ENDPOINT, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["choices"][0]["message"]["content"].strip()
-    except urllib.error.URLError as e:
-        return f"[连接失败] {e.reason}\n提示：如需禁用 SSL 验证，设置环境变量 API_SSL_VERIFY=0"
-    except Exception as e:
-        return f"[错误] {e}"
+        resp = requests.post(
+            ENDPOINT,
+            headers=headers,
+            json=body,
+            timeout=timeout,
+            verify=SSL_VERIFY
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"].strip()
+
+    except requests.exceptions.Timeout:
+        raise APIError(f"请求超时（{timeout}秒）", retryable=True)
+    except requests.exceptions.ConnectionError as e:
+        raise APIError(f"无法连接到 API 端点: {ENDPOINT}\n{_conn_hint(e)}", retryable=True)
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else "?"
+        detail = ""
+        if e.response is not None:
+            try:
+                detail = e.response.text[:300]
+            except Exception:
+                pass
+        retryable = status in (429, 500, 502, 503, 504)
+        raise APIError(f"HTTP {status}: {detail}", retryable=retryable)
+    except requests.exceptions.RequestException as e:
+        raise APIError(f"请求异常: {e}", retryable=False)
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        raise APIError(f"API 响应解析失败: {e}", retryable=False)
+
+
+def _conn_hint(exc: Exception) -> str:
+    """根据连接错误给出排查提示。"""
+    msg = str(exc)
+    if "SSL" in msg or "ssl" in msg or "certificate" in msg.lower():
+        return "提示：如需禁用 SSL 验证，设置环境变量 API_SSL_VERIFY=0"
+    if "Connection refused" in msg or "Errno 61" in msg or "Errno 111" in msg:
+        return "提示：请确认 API 服务已启动，端点地址是否正确"
+    return ""
+
+
+def call_api_with_retry(system_prompt: str, user_prompt: str,
+                        retries: int = 2, timeout: int = 60) -> str:
+    """带重试的 API 调用。"""
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            return call_api(system_prompt, user_prompt, timeout=timeout)
+        except APIError as e:
+            last_error = e
+            if not e.retryable or attempt == retries:
+                break
+            wait = (attempt + 1) * 2
+            print(f"  ⏳ 第 {attempt + 1} 次失败，{wait}秒后重试...", file=sys.stderr)
+            time.sleep(wait)
+    raise last_error  # type: ignore[misc]
 
 
 # ── 工具集 ────────────────────────────────────────────────
@@ -66,7 +116,7 @@ def call_api(system_prompt: str, user_prompt: str) -> str:
 SYSTEM_BASE = "你是一个创意伙伴，擅长从意想不到的角度激发灵感。回复用中文，保持温暖、有启发性。不要长篇大论，直接给出具体的点子。"
 
 
-def tool_reverse(inspiration: str) -> str:
+def tool_reverse(inspiration: str, retries: int = 2, timeout: int = 60) -> str:
     """逆向花园：生成失败方案并反转成好点子。"""
     prompt = f"""针对以下灵感，请做两件事：
 1. 先列出 3 个「如何把它搞砸」的具体方案
@@ -84,10 +134,10 @@ def tool_reverse(inspiration: str) -> str:
 - ...
 - ...
 - ..."""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
-def tool_scamper(inspiration: str) -> str:
+def tool_scamper(inspiration: str, retries: int = 2, timeout: int = 60) -> str:
     """嫁接实验室：按 SCAMPER 七个维度展开创意。"""
     prompt = f"""针对以下灵感，从 SCAMPER 的七个维度分别给出创意建议：
 S-替代：可以用什么代替？
@@ -101,10 +151,11 @@ R-重排：颠倒顺序会怎样？
 灵感：{inspiration}
 
 请每个维度给出一个具体的创意，格式：维度名：具体创意"""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
-def tool_extreme(inspiration: str, condition: str = "") -> str:
+def tool_extreme(inspiration: str, condition: str = "",
+                 retries: int = 2, timeout: int = 60) -> str:
     """极限温室：在极端条件下生成创意。"""
     conditions = [
         "预算为 0 元", "必须在 10 秒内完成", "在深海中实现",
@@ -120,10 +171,10 @@ def tool_extreme(inspiration: str, condition: str = "") -> str:
 极端条件：{cond}
 
 请给出 3 个具体的创意方案，每个方案要说明在这个条件下会有什么独特的变化。"""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
-def tool_analogy(inspiration: str) -> str:
+def tool_analogy(inspiration: str, retries: int = 2, timeout: int = 60) -> str:
     """自然类比：从自然现象中寻找灵感。"""
     prompt = f"""请从自然界中找 2-3 个现象来类比以下灵感，并说明从中可以获得什么启发。
 
@@ -131,10 +182,10 @@ def tool_analogy(inspiration: str) -> str:
 
 自然界有 38 亿年的智慧积累——蚂蚁的调度、蜘蛛的编织、菌丝的网络、蜜蜂的蜂巢、向日葵的螺旋……
 请选择最贴切的自然类比，并具体说明它们之间的联系和启发。"""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
-def tool_first_principles(inspiration: str) -> str:
+def tool_first_principles(inspiration: str, retries: int = 2, timeout: int = 60) -> str:
     """本源之土：第一性原理剥洋葱分析。"""
     prompt = f"""请对以下想法进行第一性原理分析，像剥洋葱一样层层深入：
 
@@ -146,10 +197,10 @@ def tool_first_principles(inspiration: str) -> str:
 3. 哪些是「本质属性」，哪些是「人为附加」的？
 4. 去掉人为附加后，剩下的核心是什么？
 5. 基于这个核心，可以重新构建什么？"""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
-def tool_pollen(inspiration: str) -> str:
+def tool_pollen(inspiration: str, retries: int = 2, timeout: int = 60) -> str:
     """随机花粉：用随机词汇强行关联。"""
     words = [
         "月亮", "咖啡渍", "旧毛衣", "北极光", "气泡",
@@ -168,10 +219,10 @@ def tool_pollen(inspiration: str) -> str:
 随机词：{word}
 
 请写出 3 个具体的、有趣的关联方式，说明「{word}」和这个灵感如何结合。"""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
-def tool_hats(inspiration: str) -> str:
+def tool_hats(inspiration: str, retries: int = 2, timeout: int = 60) -> str:
     """六顶思考帽：从六个视角分析。"""
     prompt = f"""请戴上六顶不同颜色的帽子，从六个视角分析以下灵感：
 
@@ -185,36 +236,36 @@ def tool_hats(inspiration: str) -> str:
 蓝帽子（过程）：整体来看，下一步该做什么？
 
 请逐项简洁回答。"""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
-def tool_sandbox(inspiration: str) -> str:
+def tool_sandbox(inspiration: str, retries: int = 2, timeout: int = 60) -> str:
     """空想沙盘：自由流动的创意引导。"""
     prompt = f"""请作为创意伙伴，针对以下灵感自由联想和发散。不要结构化的分析，就像和朋友聊天一样，提出 5-8 个跳跃性的、有趣的延伸想法。
 
 灵感：{inspiration}
 
 可以问问题、讲故事、联想到其他领域——让思绪像水一样自由流淌。每个想法 1-2 句话即可。"""
-    return call_api(SYSTEM_BASE, prompt)
+    return call_api_with_retry(SYSTEM_BASE, prompt, retries=retries, timeout=timeout)
 
 
 # ── 工具注册表 ────────────────────────────────────────────
 
 TOOLS = {
-    "reverse":        ("逆向花园", tool_reverse, "先想怎么搞砸，再反转成金点子"),
-    "scamper":        ("嫁接实验室", tool_scamper, "SCAMPER 创意模版，七种角度改造灵感"),
-    "extreme":        ("极限温室", tool_extreme, "极端条件逼迫非常规创意"),
-    "analogy":        ("自然类比", tool_analogy, "向大自然借用智慧"),
+    "reverse":         ("逆向花园", tool_reverse, "先想怎么搞砸，再反转成金点子"),
+    "scamper":         ("嫁接实验室", tool_scamper, "SCAMPER 创意模版，七种角度改造灵感"),
+    "extreme":         ("极限温室", tool_extreme, "极端条件逼迫非常规创意"),
+    "analogy":         ("自然类比", tool_analogy, "向大自然借用智慧"),
     "firstprinciples": ("本源之土", tool_first_principles, "第一性原理剥洋葱，找到根本"),
-    "pollen":         ("随机花粉", tool_pollen, "随机词汇强制关联，催生意外灵感"),
-    "hats":           ("六顶思考帽", tool_hats, "六种思维视角切换"),
-    "sandbox":        ("空想沙盘", tool_sandbox, "自由书写，让思绪流淌"),
+    "pollen":          ("随机花粉", tool_pollen, "随机词汇强制关联，催生意外灵感"),
+    "hats":            ("六顶思考帽", tool_hats, "六种思维视角切换"),
+    "sandbox":         ("空想沙盘", tool_sandbox, "自由书写，让思绪流淌"),
 }
 
 
 # ── 命令行接口 ────────────────────────────────────────────
 
-def interactive_mode():
+def interactive_mode(retries: int = 2, timeout: int = 60):
     """交互式菜单。"""
     print("\n🌱 MindGarden AI 创意生成器")
     print(f"   模型: {MODEL}  |  端点: {ENDPOINT}")
@@ -249,22 +300,29 @@ def interactive_mode():
             continue
 
         print(f"\n🤔 {name} 正在思考...\n")
-        result = func(inspiration)
-        print("─" * 50)
-        print(result)
-        print("─" * 50)
+        try:
+            result = func(inspiration, retries=retries, timeout=timeout)
+            print("─" * 50)
+            print(result)
+            print("─" * 50)
+        except APIError as e:
+            print(f"❌ {e}", file=sys.stderr)
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="MindGarden AI 创意生成器",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="环境变量: API_ENDPOINT, API_KEY, API_MODEL"
+        epilog="环境变量: API_ENDPOINT, API_KEY, API_MODEL, API_SSL_VERIFY"
     )
     parser.add_argument("--tool", "-t", choices=list(TOOLS.keys()),
                         help="指定使用的创意工具")
     parser.add_argument("--list", "-l", action="store_true",
                         help="列出所有工具")
+    parser.add_argument("--retry", "-r", type=int, default=2,
+                        help="失败重试次数（默认 2）")
+    parser.add_argument("--timeout", type=int, default=60,
+                        help="请求超时秒数（默认 60）")
     parser.add_argument("inspiration", nargs="?", default="",
                         help="灵感文本（如包含空格请用引号）")
 
@@ -282,14 +340,18 @@ def main():
         if not inspiration:
             inspiration = input("请输入灵感/想法: ").strip()
         if not inspiration:
-            print("错误：需要提供灵感文本")
+            print("错误：需要提供灵感文本", file=sys.stderr)
             sys.exit(1)
 
         print(f"\n🤔 {name} 正在思考...\n")
-        result = func(inspiration)
-        print(result)
+        try:
+            result = func(inspiration, retries=args.retry, timeout=args.timeout)
+            print(result)
+        except APIError as e:
+            print(f"❌ {e}", file=sys.stderr)
+            sys.exit(1)
     else:
-        interactive_mode()
+        interactive_mode(retries=args.retry, timeout=args.timeout)
 
 
 if __name__ == "__main__":

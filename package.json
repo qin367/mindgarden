@@ -4,8 +4,8 @@
   "description": "🌱 MindGarden 创意花园 - 一个纯本地、离线可用的私人创意管理应用",
   "main": "src/js/main.js",
   "scripts": {
-    "start": "npx serve . -l 8080",
-    "dev": "npx serve . -l 8080",
+    "start": "npx serve . -l 9090",
+    "dev": "npx serve . -l 9090",
     "build": "echo 'No build step required'",
     "test": "echo 'No tests yet'",
     "lint": "echo 'No linter configured'",

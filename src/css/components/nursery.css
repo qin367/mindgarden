@@ -1,0 +1,128 @@
+/* ====== 苗圃 ====== */
+.nursery-input-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  box-shadow: 0 2px 12px var(--shadow);
+  margin-bottom: 32px;
+  transition: all 0.3s ease;
+}
+
+.nursery-input-card:focus-within {
+  box-shadow: 0 4px 20px var(--shadow-hover);
+  border-color: var(--accent-sage);
+}
+
+.mood-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.mood-btn {
+  font-size: 1.5rem;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.mood-btn:hover { transform: scale(1.15); background: var(--bg-hover); }
+.mood-btn.active {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold);
+  box-shadow: 0 0 0 2px var(--accent-gold);
+  transform: scale(1.1);
+}
+
+.nursery-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  resize: vertical;
+  transition: border-color 0.3s ease;
+  line-height: 1.8;
+}
+
+.nursery-textarea:focus { outline: none; border-color: var(--accent-sage); }
+.nursery-textarea::placeholder { color: var(--text-muted); }
+
+.nursery-tags-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.tag-input {
+  flex: 1;
+  min-width: 150px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: var(--bg-input);
+}
+
+.tag-input:focus { outline: none; border-color: var(--accent-sage); }
+
+.btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover { transform: scale(1.04); }
+
+.btn-primary {
+  background: var(--accent-sage);
+  color: #fff;
+}
+
+.btn-primary:hover { background: #7a9a74; box-shadow: 0 4px 12px rgba(143, 168, 138, 0.3); }
+
+.btn-terracotta {
+  background: var(--accent-terracotta);
+  color: #fff;
+}
+
+.btn-terracotta:hover { box-shadow: 0 4px 12px rgba(193, 127, 89, 0.3); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover { background: var(--bg-hover); }
+
+.btn-danger {
+  background: #c0392b;
+  color: #fff;
+}
+
+.btn-danger:hover { background: #a93226; }
+
+.btn-sm { padding: 4px 12px; font-size: 0.85rem; }
+

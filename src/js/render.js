@@ -149,7 +149,7 @@ window.MindGarden = window.MindGarden || {};
     </div>
     <div id="nurseryInspirationList">
       <h3 style="font-size:1rem;color:var(--text-secondary);margin-bottom:12px;">🌰 种子箱 · 最近的灵感</h3>
-      ${renderFilterBar(allTags, filterTag, 'filter-tag')}
+      ${MG.raw(renderFilterBar(allTags, filterTag, 'filter-tag'))}
       <div class="inspiration-list" role="list">${MG.raw(listHTML)}</div>
     </div>`;
   }
